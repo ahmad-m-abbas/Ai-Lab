@@ -74,5 +74,6 @@ class Perceptron:
             # Calculate the mean squared error for this epoch
             mean_mse = total_mse / len(X)
             print(f"Epoch {epoch + 1}/{self.epochs}, Mean Squared Error:{mean_mse:.4f}")
+        
 
 
