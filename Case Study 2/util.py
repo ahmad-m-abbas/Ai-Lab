@@ -22,7 +22,7 @@ class Utils:
     def find_best_rf_parameters(X_train, y_train):
         rf_param_grid = {
             'n_estimators': [10, 50, 100],
-            'criterion': ['entropy', 'gini'],
+            'criterion': ['gini', 'entropy'],
             'max_depth': [10, 50, 100],
             'max_features': ["sqrt", "log2"]
         }
@@ -58,7 +58,7 @@ class Utils:
         xgb_param_grid = {
             'n_estimators': [10, 50, 100],
             'learning_rate': [0.01, 0.1],
-            'max_depth': [5, 10, 15]
+            'max_depth': [5, 50, 100]
         }
         start_time = time.time()
         xgb_model = xgb.XGBClassifier(enable_categorical=True, early_stopping_rounds=10, n_jobs=-1)
