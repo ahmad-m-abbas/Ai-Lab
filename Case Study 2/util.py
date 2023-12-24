@@ -17,40 +17,30 @@ from skimage import feature as ft
 import time
 import gc
 import xgboost as xgb
-
+from sklearn.model_selection import RandomizedSearchCV
 class Utils:
-    def find_best_rf_parameters(X_train, y_train, X_val, y_val):   
+    def find_best_rf_parameters(X_train, y_train):
         rf_param_grid = {
             'n_estimators': [10, 50, 100],
             'criterion': ['entropy', 'gini'],
             'max_depth': [10, 50, 100],
             'max_features': ["sqrt", "log2"]
         }
-        rf_grid = ParameterGrid(rf_param_grid)
-        data = []
-        head = ['n_estimators', 'criterion', 'max_depth', 'max_features', 'score in validation set']
     
+        random_search = RandomizedSearchCV(RandomForestClassifier(), rf_param_grid, n_iter=10, cv=3, verbose=2, n_jobs=-1)
+        
         start_time = time.time()
-        for param in rf_grid:
-            rf_model = RandomForestClassifier(**param)
-            rf_model.fit(X_train, y_train)
-            
-            y_pred = rf_model.predict(X_val)
-            score = accuracy_score(y_val, y_pred)
-            list_entry = [param['n_estimators'],  param['criterion'], param['max_depth'], param['max_features'], score]
-            data.insert(0, list_entry)
-            del rf_model, y_pred
-            gc.collect()
+        random_search.fit(X_train, y_train)
+    
+        print("\nAll Results:")
+        for mean_score, params in zip(random_search.cv_results_['mean_test_score'], random_search.cv_results_['params']):
+            print(f"{params} with accuracy: {mean_score}")
     
         # Find the best model
-        max_accuracy = max(entry[4] for entry in data)
-        best_model = max(data, key=lambda x: x[4])
+        best_model = random_search.best_estimator_
+        print("\n--- %s seconds ---" % (time.time() - start_time))
+        print("The highest Accuracy {:.5f} is the model with parameters: {}".format(random_search.best_score_, random_search.best_params_))
     
-        # Print the results in a table format
-        print(tabulate(data, headers=head, tablefmt="pipe"))
-        print("--- %s seconds ---" % (time.time() - start_time))
-        print("The highest Accuracy {:.5f} is the model with n_estimators = {}, criterion = '{}', max_depth = {}, and max_features = '{}'"
-              .format(best_model[4], best_model[0], best_model[1], best_model[2], best_model[3]))
         return best_model
 
     def accuracy_measure_rf(X_train, y_train, X_test, y_test, n_estimators = 50, criterion  = 'entropy', max_depth =10, max_features='log2'):
@@ -66,35 +56,25 @@ class Utils:
 
     def find_best_xgb_parameters(X_train, y_train, X_val, y_val):
         xgb_param_grid = {
-            'n_estimators': [10, 100],
-            'learning_rate': [0.01, 0.1, 0.5],
-            'max_depth': [10, 50]
+            'n_estimators': [10, 50, 100],
+            'learning_rate': [0.01, 0.1],
+            'max_depth': [5, 10, 15]
         }
-        xgb_grid = ParameterGrid(xgb_param_grid)
-        data = []
-        head = ['n_estimators', 'learning_rate', 'max_depth', 'score in validation set']
-    
         start_time = time.time()
-        for param in xgb_grid:
-            xgb_model = xgb.XGBClassifier(**param)
-            xgb_model.fit(X_train, y_train)
-            y_pred = xgb_model.predict(X_val)
-            score = accuracy_score(y_val, y_pred)
-            list_entry = [param['n_estimators'], param['learning_rate'], param['max_depth'], score]
-            data.insert(0, list_entry)
-            del xgb_model, y_pred
-            gc.collect()
-            print("Finished", param)
-    
-        # Find the best model
-        max_accuracy = max(entry[5] for entry in data)
-        best_model = max(data, key=lambda x: x[5])
-    
-        # Print the results in a table format
-        print(tabulate(data, headers=head, tablefmt="pipe"))
+        xgb_model = xgb.XGBClassifier(enable_categorical=True, early_stopping_rounds=10, n_jobs=-1)
+        random_search = RandomizedSearchCV(xgb_model, xgb_param_grid, n_iter=10, cv=3, verbose=2, n_jobs=2)
+        random_search.fit(X_train, y_train, eval_set=[(X_val, y_val)], verbose=False)
         print("--- %s seconds ---" % (time.time() - start_time))
-        print("The highest Accuracy {:.5f} is the model with n_estimators = {}, learning_rate = {}, max_depth = {}"
-              .format(best_model[5], best_model[0], best_model[1], best_model[2]))
+        # Log all results with their accuracies
+        print("All Results:")
+        for mean_score, params in zip(random_search.cv_results_['mean_test_score'], random_search.cv_results_['params']):
+            print(f"{params} with accuracy: {mean_score}")
+    
+        # Best Model Information
+        best_model = random_search.best_estimator_
+        print("\nBest parameters found: ", random_search.best_params_)
+        print("Best accuracy found: ", random_search.best_score_)
+    
         return best_model
     def accuracy_measure_xgb(X_train, y_train, X_test, y_test, n_estimators = 50, learning_rate  = 0.1, max_depth =10, subsample=0.5, colsample_bytree=0.5):
         start_time = time.time()
